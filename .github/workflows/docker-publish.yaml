@@ -32,4 +32,4 @@ jobs:
           context: .
           platforms: linux/amd64, linux/arm64
           push: true
-          tags: kti-richard/test-multiarch:latest
+          tags: ghcr.io/${{github.repository_owner}}/test-multiarch:latest
