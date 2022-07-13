@@ -1,14 +1,19 @@
-FROM rclone/rclone:1
+FROM --platform=$BUILDPLATFORM caddy:2.5.0-builder AS builder
+RUN xcaddy build \
+    --with github.com/greenpau/caddy-security \
+    --with github.com/greenpau/caddy-trace
 
-COPY docker-entrypoint.sh /usr/local/bin
+FROM --platform=$BUILDPLATFORM caddy:2.5.0
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+RUN apk add --no-cache nss-tools tzdata && \
+    mkdir -p /opt/caddy/auth/
 
-RUN apk add --no-cache tzdata inotify-tools bash && \
-    mkdir -p /config/triggers
+# keys.env defaults
+ENV JWT_KEY=AnExampleSecretString123
 
-ENV BACKUP_ENDPOINT=EliteCloudGD
-ENV AWS_ACCESS_KEY_ID=ACCESS_KEY_ID_FOR_S3_BACKUPS
-ENV AWS_SECRET_ACCESS_KEY=SECRET_KEY_FOR_S3_BACKUPS
+# caddy/.env defaults
+ENV CA_CN_ID=CA_CN_ID_NOT_CONFIGURED
 
-ENTRYPOINT [ "/usr/local/bin/docker-entrypoint.sh" ]
-
-
+ADD ./css /opt/caddy/css
+ADD ./templates /opt/caddy/templates
+ADD ./Caddyfile /etc/caddy

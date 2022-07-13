@@ -1,0 +1,82 @@
+{
+        http_port 8080
+        https_port 8443
+        debug
+        local_certs
+
+	order authenticate before respond
+	order authorize before basicauth
+        
+        security {
+                authentication portal myportal {
+                        crypto default token lifetime 3600
+                        crypto key sign-verify {$JWT_KEY}
+                        backend local /data/user_db.json local
+                        # Ignore until we figure out SMTP stuff
+                        # registration {
+                        #        dropbox /opt/caddy/auth/registrations_db.json
+                        #        title "User Registration"
+                        # }
+                        ui {
+                                theme basic
+
+                                # Our custom page templates are currently broken with new caddy-security
+                                # Keep the ADD in the Dockerfile, uncomment this once templates are fixed
+
+                                # template login "/opt/caddy/templates/em20-tmpl/login.template"
+                                # template generic "/opt/caddy/templates/em20-tmpl/generic.template"
+                                # template portal "/opt/caddy/templates/em20-tmpl/portal.template"
+                                # template register "/opt/caddy/templates/em20-tmpl/register.template"
+                                # template whoami "/opt/caddy/templates/em20-tmpl/whoami.template"
+                                # template settings "/opt/caddy/templates/em20-tmpl/settings.template"
+                                # template sandbox "/opt/caddy/templates/em20-tmpl/sandbox.template"
+                                # custom css path "/opt/caddy/css/custom.css"
+                                links {
+                                        "Elite Manager" /em
+                                        "My Auth Portal Settings" /auth/settings icon "las la-cog"
+                                        "who am i check" /auth/whoami icon "las la-star"
+                                        "Add MFA Authentication App" /auth/settings/mfa/add/app
+                                        "Manage Users" /user-mgr/ icon "las la-users"
+                                }
+                        }
+			
+			transform user {
+				match origin local
+				action add role authp/user
+			}
+                }
+
+                authorization policy mypolicy {
+                        set auth url /auth
+                        crypto key verify {$JWT_KEY}
+                        allow roles authp/admin authp/user
+                        inject headers with claims
+                }
+        }
+}
+
+https:// {
+        tls internal {
+                on_demand
+        }
+
+        route /auth* {
+                authenticate with myportal
+        }
+        route /gr/* {
+                authorize with mypolicy
+                reverse_proxy http://grafana:3000
+        }
+        route /version {
+                respond * "2.0.0-a" 200
+        }
+        route /ui/* {
+                authorize with mypolicy
+                reverse_proxy http://nodered:1880
+        }
+        route /* {
+                authorize with mypolicy
+                reverse_proxy http://em20:1081
+        }
+}
+
